@@ -458,9 +458,14 @@ bot.on('message', async (msg) => {
   }
 
   try {
-    await bot.copyMessage(question.userId, msg.chat.id, msg.message_id);
+    const replyText = msg.text || '';
+    if (replyText) {
+      await bot.sendMessage(question.userId, `Модератор: "${escapeHtml(replyText)}"`, { parse_mode: 'HTML' });
+    } else {
+      await bot.sendMessage(question.userId, 'Модератор: ""');
+    }
   } catch (error) {
-    console.error('Failed to copy moderator answer to user:', error.message);
+    console.error('Failed to send moderator answer to user:', error.message);
     await bot.sendMessage(msg.chat.id, '⚠️ Не удалось переслать ответ пользователю.');
     return;
   }
