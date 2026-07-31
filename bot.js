@@ -535,6 +535,12 @@ bot.on('message', async (msg) => {
         console.error('Failed to delete claimed question notice:', error.message);
       }
     }
+
+    try {
+      await bot.deleteMessage(MODERATOR_GROUP_ID, msg.message_id);
+    } catch (error) {
+      console.error('Failed to delete moderator reply message:', error.message);
+    }
   }
 
   question.answered = true;
