@@ -208,43 +208,43 @@ bot.onText(/^\/(start)\b/i, async (msg) => {
   }
 });
 
-bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unban|bans)(?=\s|$)/i, async (msg, match) => {
+bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|help|ban|unban|bans)(?=\s|$)/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
   }
 
-  const hasBPrefix = String(match[1] || '').toLowerCase() === 'b';
+  const hasHPrefix = String(match[1] || '').toLowerCase() === 'h';
   const rawCommand = String(match[2] || '').toLowerCase();
-  const command = hasBPrefix ? `b${rawCommand}` : rawCommand;
+  const command = hasHPrefix ? `h${rawCommand}` : rawCommand;
   const text = msg.text || '';
 
-  if (command === 'help' || command === 'помощь' || command === 'bhelp') {
+  if (command === 'help' || command === 'помощь' || command === 'хелп' || command === 'hhelp') {
     await bot.sendMessage(
       msg.chat.id,
-      '🛡️ Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!help\n\n🇬🇧 English aliases:\n/bban <@username> time reason\n/bunban <@username>\n/bbans\n/bhelp'
+      '🛡️ Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!помощь\n!хелп\n\n🇬🇧 English aliases:\n/hban <@username> time reason\n/hunban <@username>\n/hbans\n/hhelp'
     );
     return;
   }
 
-  if (command === 'баны' || command === 'bans' || command === 'bbans') {
+  if (command === 'баны' || command === 'bans' || command === 'hbans') {
     await bot.sendMessage(msg.chat.id, formatBanList());
     return;
   }
 
   if (rawCommand === 'ban' || rawCommand === 'unban' || rawCommand === 'bans') {
-    if (!hasBPrefix && !msg.text.startsWith('!')) {
+    if (!hasHPrefix && !msg.text.startsWith('!')) {
       return;
     }
   }
 
-  if (command === 'разбан' || command === 'unban' || command === 'bunban') {
-    if (!hasBPrefix && !text.startsWith('!')) {
+  if (command === 'разбан' || command === 'unban' || command === 'hunban') {
+    if (!hasHPrefix && !text.startsWith('!')) {
       return;
     }
 
     const username = extractMentionUsername(text);
     if (!username) {
-      await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /bunban @username');
+      await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /hunban @username');
       return;
     }
 
@@ -254,8 +254,8 @@ bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unb
     return;
   }
 
-  if (command === 'бан' || command === 'ban' || command === 'bban') {
-    if (!hasBPrefix && !text.startsWith('!')) {
+  if (command === 'бан' || command === 'ban' || command === 'hban') {
+    if (!hasHPrefix && !text.startsWith('!')) {
       return;
     }
     const args = text.split(/\s+/).slice(1);
@@ -268,7 +268,7 @@ bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unb
     if (!username) {
       await bot.sendMessage(
         msg.chat.id,
-        '⚠️ Формат: !бан <@username> [время] [причина] или /bban <@username> [time] [reason]'
+        '⚠️ Формат: !бан <@username> [время] [причина] или /hban <@username> [time] [reason]'
       );
       return;
     }
