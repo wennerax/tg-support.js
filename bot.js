@@ -431,7 +431,7 @@ bot.on('message', async (msg) => {
   }
 
   const question = Object.values(state.questions).find((entry) => {
-    return entry && entry.originalMessageId === replyTo.message_id;
+    return entry && entry.moderatorMessageId === replyTo.message_id;
   });
 
   if (!question) {
