@@ -85,12 +85,54 @@ function isBanned(user) {
 }
 
 function parseDurationToMs(value) {
-  const match = String(value).match(/^([0-9]+)([smhd])$/i);
+  const normalized = String(value).trim().toLowerCase();
+  const match = normalized.match(/^([0-9]+)\s*([a-zа-яё]+)$/i);
   if (!match) return null;
+
   const amount = Number(match[1]);
   const unit = match[2].toLowerCase();
-  const map = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
-  return amount * map[unit];
+  const map = {
+    s: 1000,
+    sec: 1000,
+    secs: 1000,
+    second: 1000,
+    seconds: 1000,
+    'с': 1000,
+    сек: 1000,
+    секунд: 1000,
+    секунда: 1000,
+    секунды: 1000,
+    m: 60 * 1000,
+    min: 60 * 1000,
+    mins: 60 * 1000,
+    minute: 60 * 1000,
+    minutes: 60 * 1000,
+    'м': 60 * 1000,
+    мин: 60 * 1000,
+    минут: 60 * 1000,
+    минута: 60 * 1000,
+    минуты: 60 * 1000,
+    h: 60 * 60 * 1000,
+    hr: 60 * 60 * 1000,
+    hrs: 60 * 60 * 1000,
+    hour: 60 * 60 * 1000,
+    hours: 60 * 60 * 1000,
+    'ч': 60 * 60 * 1000,
+    час: 60 * 60 * 1000,
+    часа: 60 * 60 * 1000,
+    часов: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+    day: 24 * 60 * 60 * 1000,
+    days: 24 * 60 * 60 * 1000,
+    'д': 24 * 60 * 60 * 1000,
+    день: 24 * 60 * 60 * 1000,
+    дня: 24 * 60 * 60 * 1000,
+    дней: 24 * 60 * 60 * 1000,
+  };
+
+  const ms = map[unit];
+  if (!ms) return null;
+  return amount * ms;
 }
 
 function extractMentionUsername(text) {
@@ -125,6 +167,25 @@ async function summarizeUser(user) {
   return username;
 }
 
+async function sendModeratorMessage(text, options = {}) {
+  try {
+    return await bot.sendMessage(MODERATOR_GROUP_ID, text, options);
+  } catch (error) {
+    console.error('Failed to send moderator group message:', error.message);
+    return null;
+  }
+}
+
+async function forwardToModeratorGroup(chatId, messageId) {
+  try {
+    const forwarded = await bot.forwardMessage(MODERATOR_GROUP_ID, chatId, messageId);
+    return forwarded;
+  } catch (error) {
+    console.error('Failed to forward message to moderator group:', error.message);
+    return null;
+  }
+}
+
 bot.onText(/^\/(start)\b/i, async (msg) => {
   if (msg.chat.type === 'private') {
     await bot.sendMessage(
@@ -134,7 +195,7 @@ bot.onText(/^\/(start)\b/i, async (msg) => {
   }
 });
 
-bot.onText(/^(?:!|\/)(бан|разбан|баны|помощь|help|ban|unban|bans)\b/i, async (msg, match) => {
+bot.onText(/^(?:!|\/)(бан|разбан|баны|помощь|help|ban|unban|bans)(?=\s|$)/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
   }
@@ -230,8 +291,7 @@ bot.on('callback_query', async (callbackQuery) => {
       text: `Вы взяли вопрос в работу. Теперь ответьте на это сообщение в группе.`
     });
 
-    await bot.sendMessage(
-      MODERATOR_GROUP_ID,
+    await sendModeratorMessage(
       `Модератор ${await summarizeUser(callbackQuery.from)} взял вопрос в работу.`
     );
     return;
@@ -243,8 +303,7 @@ bot.on('callback_query', async (callbackQuery) => {
     await bot.answerCallbackQuery(callbackQuery.id, {
       text: `Пользователь ${await summarizeUser(user)} забанен.`,
     });
-    await bot.sendMessage(
-      MODERATOR_GROUP_ID,
+    await sendModeratorMessage(
       `Пользователь ${await summarizeUser(user)} забанен модератором ${await summarizeUser(callbackQuery.from)}.`
     );
     return;
@@ -266,10 +325,17 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    const forwarded = await bot.forwardMessage(MODERATOR_GROUP_ID, msg.chat.id, msg.message_id);
+    const forwarded = await forwardToModeratorGroup(msg.chat.id, msg.message_id);
+    if (!forwarded) {
+      await bot.sendMessage(
+        msg.chat.id,
+        '⚠️ Модерационная группа сейчас недоступна. Попробуйте позже.'
+      );
+      return;
+    }
+
     const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || '')}`;
-    const keyboardMessage = await bot.sendMessage(
-      MODERATOR_GROUP_ID,
+    const keyboardMessage = await sendModeratorMessage(
       questionText,
       {
         parse_mode: 'HTML',
@@ -281,6 +347,14 @@ bot.on('message', async (msg) => {
         },
       }
     );
+
+    if (!keyboardMessage) {
+      await bot.sendMessage(
+        msg.chat.id,
+        '⚠️ Модерационная группа сейчас недоступна. Попробуйте позже.'
+      );
+      return;
+    }
 
     await bot.sendMessage(
       msg.chat.id,
@@ -327,14 +401,26 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  await bot.forwardMessage(question.userId, msg.chat.id, msg.message_id);
-  await bot.editMessageReplyMarkup(
-    { inline_keyboard: [] },
-    {
-      chat_id: MODERATOR_GROUP_ID,
-      message_id: question.moderatorMessageId,
-    }
-  );
+  try {
+    await bot.forwardMessage(question.userId, msg.chat.id, msg.message_id);
+  } catch (error) {
+    console.error('Failed to forward moderator answer to user:', error.message);
+    await bot.sendMessage(msg.chat.id, '⚠️ Не удалось переслать ответ пользователю.');
+    return;
+  }
+
+  try {
+    await bot.editMessageReplyMarkup(
+      { inline_keyboard: [] },
+      {
+        chat_id: MODERATOR_GROUP_ID,
+        message_id: question.moderatorMessageId,
+      }
+    );
+  } catch (error) {
+    console.error('Failed to clear moderator keyboard:', error.message);
+  }
+
   question.answered = true;
   saveState();
   await bot.sendMessage(msg.chat.id, '✅ Ответ переслан пользователю.');
