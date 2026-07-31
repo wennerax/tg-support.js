@@ -199,7 +199,7 @@ async function tryDeleteMessage(chatId, messageId) {
   }
 }
 
-bot.onText(/^\/(start)\b/i, async (msg) => {
+bot.onText(/^\/(start)(?:@[A-Za-z0-9_]+)?\b/i, async (msg) => {
   if (msg.chat.type === 'private') {
     await bot.sendMessage(
       msg.chat.id,
@@ -208,7 +208,7 @@ bot.onText(/^\/(start)\b/i, async (msg) => {
   }
 });
 
-bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|help|ban|unban|bans)(?=\s|$)/i, async (msg, match) => {
+bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|help|ban|unban|bans)(?:@[A-Za-z0-9_]+)?(?=\s|$)/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
   }
