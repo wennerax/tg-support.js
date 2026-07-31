@@ -379,25 +379,16 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    const forwarded = await forwardToModeratorGroup(msg.chat.id, msg.message_id);
-    if (!forwarded) {
-      await bot.sendMessage(
-        msg.chat.id,
-        '⚠️ Модерационная группа сейчас недоступна. Попробуйте позже.'
-      );
-      return;
-    }
-
-    const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || '')}`;
+    const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}:\n${escapeHtml(msg.text || '')}`;
     const keyboardMessage = await sendModeratorMessage(
       questionText,
       {
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: 'Ответить', callback_data: `answer:${forwarded.message_id}` }],
-            [{ text: 'Закрыть', callback_data: `close:${forwarded.message_id}` }],
-            [{ text: 'Забанить', callback_data: `ban:${forwarded.message_id}` }],
+            [{ text: 'Ответить', callback_data: `answer:${msg.message_id}` }],
+            [{ text: 'Закрыть', callback_data: `close:${msg.message_id}` }],
+            [{ text: 'Забанить', callback_data: `ban:${msg.message_id}` }],
           ],
         },
       }
@@ -420,7 +411,7 @@ bot.on('message', async (msg) => {
       userId: msg.from.id,
       userUsername: msg.from.username || null,
       originalMessageId: msg.message_id,
-      forwardedMessageId: forwarded.message_id,
+      forwardedMessageId: msg.message_id,
       moderatorMessageId: keyboardMessage.message_id,
       claimedBy: null,
       answered: false,
