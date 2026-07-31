@@ -324,20 +324,11 @@ bot.on('callback_query', async (callbackQuery) => {
     saveState();
 
     await bot.answerCallbackQuery(callbackQuery.id, { text: 'Вопрос закрыт.' });
-    await bot.editMessageText(
-      '🔒 Закрытый вопрос',
-      {
-        chat_id: MODERATOR_GROUP_ID,
-        message_id: question.moderatorMessageId,
-      }
-    );
-    await bot.editMessageReplyMarkup(
-      { inline_keyboard: [] },
-      {
-        chat_id: MODERATOR_GROUP_ID,
-        message_id: question.moderatorMessageId,
-      }
-    );
+    try {
+      await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
+    } catch (error) {
+      console.error('Failed to delete closed question message:', error.message);
+    }
     return;
   }
 
