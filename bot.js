@@ -403,8 +403,10 @@ bot.on('message', async (msg) => {
       return;
     }
 
+    let forwardedMediaMessageId = null;
     if (hasMedia) {
-      await forwardToModeratorGroup(msg.chat.id, msg.message_id);
+      const forwardedMedia = await forwardToModeratorGroup(msg.chat.id, msg.message_id);
+      forwardedMediaMessageId = forwardedMedia?.message_id || null;
     }
 
     await bot.sendMessage(
@@ -421,6 +423,7 @@ bot.on('message', async (msg) => {
       claimedBy: null,
       answered: false,
       closed: false,
+      forwardedMediaMessageId,
     };
     saveState();
     return;
@@ -516,6 +519,14 @@ bot.on('message', async (msg) => {
       await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
     } catch (error) {
       console.error('Failed to delete moderator question message:', error.message);
+    }
+
+    if (question.forwardedMediaMessageId) {
+      try {
+        await bot.deleteMessage(MODERATOR_GROUP_ID, question.forwardedMediaMessageId);
+      } catch (error) {
+        console.error('Failed to delete forwarded media message:', error.message);
+      }
     }
   }
 
