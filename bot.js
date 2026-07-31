@@ -22,6 +22,12 @@ let state = loadState();
 function loadState() {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
+
+    if (!fs.existsSync(STATE_FILE)) {
+      saveState();
+      return { ...DEFAULT_STATE };
+    }
+
     const raw = fs.readFileSync(STATE_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     return {
@@ -29,13 +35,14 @@ function loadState() {
       questions: parsed.questions || {},
     };
   } catch (error) {
+    console.error('Failed to load state:', error.message);
     return { ...DEFAULT_STATE };
   }
 }
 
 function saveState() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
 }
 
 function normalizeUserKey(user) {
@@ -468,6 +475,12 @@ bot.on('message', async (msg) => {
     );
   } catch (error) {
     console.error('Failed to clear moderator keyboard:', error.message);
+  }
+
+  try {
+    await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
+  } catch (error) {
+    console.error('Failed to delete moderator question message:', error.message);
   }
 
   question.answered = true;
