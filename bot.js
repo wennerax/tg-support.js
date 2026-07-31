@@ -311,9 +311,13 @@ bot.on('callback_query', async (callbackQuery) => {
       text: `Вы взяли вопрос в работу. Теперь ответьте на это сообщение в группе.`
     });
 
-    await sendModeratorMessage(
+    const claimMessage = await sendModeratorMessage(
       `Модератор ${await summarizeUser(callbackQuery.from)} взял вопрос в работу.`
     );
+    if (claimMessage?.message_id) {
+      question.claimedNoticeMessageId = claimMessage.message_id;
+      saveState();
+    }
     return;
   }
 
@@ -523,11 +527,26 @@ bot.on('message', async (msg) => {
     } catch (error) {
       console.error('Failed to delete moderator question message:', error.message);
     }
+
+    if (question.claimedNoticeMessageId) {
+      try {
+        await bot.deleteMessage(MODERATOR_GROUP_ID, question.claimedNoticeMessageId);
+      } catch (error) {
+        console.error('Failed to delete claimed question notice:', error.message);
+      }
+    }
   }
 
   question.answered = true;
   saveState();
-  await bot.sendMessage(msg.chat.id, '✅ Ответ переслан пользователю.');
+  const confirmationMessage = await bot.sendMessage(msg.chat.id, '✅ Ответ переслан пользователю.');
+  setTimeout(async () => {
+    try {
+      await bot.deleteMessage(msg.chat.id, confirmationMessage.message_id);
+    } catch (error) {
+      console.error('Failed to delete confirmation message:', error.message);
+    }
+  }, 5000);
 });
 
 bot.on('polling_error', (error) => {
