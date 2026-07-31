@@ -218,7 +218,17 @@ bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unb
     return;
   }
 
+  if (rawCommand === 'ban' || rawCommand === 'unban' || rawCommand === 'bans') {
+    if (!hasBPrefix && !msg.text.startsWith('!')) {
+      return;
+    }
+  }
+
   if (command === 'разбан' || command === 'unban' || command === 'bunban') {
+    if (!hasBPrefix && !text.startsWith('!')) {
+      return;
+    }
+
     const username = extractMentionUsername(text);
     if (!username) {
       await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /bunban @username');
@@ -232,6 +242,9 @@ bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unb
   }
 
   if (command === 'бан' || command === 'ban' || command === 'bban') {
+    if (!hasBPrefix && !text.startsWith('!')) {
+      return;
+    }
     const args = text.split(/\s+/).slice(1);
     const username = extractMentionUsername(text);
     const durationArg = args.find((item) => parseDurationToMs(item));
