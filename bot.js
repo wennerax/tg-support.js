@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
-const TelegramBot = require('node-telegram-bot-api');
+const { TelegramBot } = require('node-telegram-bot-api');
 
 const token = process.env.BOT_TOKEN;
 const MODERATOR_GROUP_ID = Number(process.env.MODERATOR_GROUP_ID);
