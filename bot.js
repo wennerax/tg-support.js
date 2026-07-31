@@ -379,7 +379,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}:\n${escapeHtml(msg.text || '')}`;
+    const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || '')}`;
     const keyboardMessage = await sendModeratorMessage(
       questionText,
       {
@@ -431,7 +431,7 @@ bot.on('message', async (msg) => {
   }
 
   const question = Object.values(state.questions).find((entry) => {
-    return entry && entry.forwardedMessageId === replyTo.message_id;
+    return entry && entry.originalMessageId === replyTo.message_id;
   });
 
   if (!question) {
