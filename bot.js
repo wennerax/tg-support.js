@@ -448,12 +448,45 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  let sentUserReply = false;
+
   try {
     const replyText = msg.text || '';
-    if (replyText) {
+    const hasMedia = Boolean(msg.photo || msg.sticker || msg.video || msg.voice || msg.document || msg.audio || msg.video_note || msg.animation || msg.contact);
+
+    if (hasMedia) {
+      const mediaPayload = {
+        chat_id: question.userId,
+        reply_to_message_id: undefined,
+      };
+
+      if (msg.photo) {
+        await bot.sendPhoto(question.userId, msg.photo[msg.photo.length - 1].file_id, { caption: 'Модератор' });
+      } else if (msg.video) {
+        await bot.sendVideo(question.userId, msg.video.file_id, { caption: 'Модератор' });
+      } else if (msg.document) {
+        await bot.sendDocument(question.userId, msg.document.file_id, { caption: 'Модератор' });
+      } else if (msg.audio) {
+        await bot.sendAudio(question.userId, msg.audio.file_id, { caption: 'Модератор' });
+      } else if (msg.voice) {
+        await bot.sendVoice(question.userId, msg.voice.file_id, { caption: 'Модератор' });
+      } else if (msg.sticker) {
+        await bot.sendSticker(question.userId, msg.sticker.file_id);
+      } else if (msg.animation) {
+        await bot.sendAnimation(question.userId, msg.animation.file_id, { caption: 'Модератор' });
+      } else if (msg.video_note) {
+        await bot.sendVideoNote(question.userId, msg.video_note.file_id);
+      } else if (msg.contact) {
+        await bot.sendContact(question.userId, msg.contact.phone_number, msg.contact.first_name, { last_name: msg.contact.last_name });
+      }
+
+      sentUserReply = true;
+    } else if (replyText) {
       await bot.sendMessage(question.userId, `Модератор: "${escapeHtml(replyText)}"`, { parse_mode: 'HTML' });
+      sentUserReply = true;
     } else {
       await bot.sendMessage(question.userId, 'Модератор: ""');
+      sentUserReply = true;
     }
   } catch (error) {
     console.error('Failed to send moderator answer to user:', error.message);
@@ -473,10 +506,12 @@ bot.on('message', async (msg) => {
     console.error('Failed to clear moderator keyboard:', error.message);
   }
 
-  try {
-    await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
-  } catch (error) {
-    console.error('Failed to delete moderator question message:', error.message);
+  if (sentUserReply) {
+    try {
+      await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
+    } catch (error) {
+      console.error('Failed to delete moderator question message:', error.message);
+    }
   }
 
   question.answered = true;
