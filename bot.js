@@ -379,7 +379,8 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || '')}`;
+    const hasMedia = Boolean(msg.photo || msg.sticker || msg.video || msg.voice || msg.document || msg.audio || msg.video_note || msg.animation || msg.contact);
+    const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || msg.caption || '')}`;
     const keyboardMessage = await sendModeratorMessage(
       questionText,
       {
@@ -400,6 +401,10 @@ bot.on('message', async (msg) => {
         '⚠️ Модерационная группа сейчас недоступна. Попробуйте позже.'
       );
       return;
+    }
+
+    if (hasMedia) {
+      await forwardToModeratorGroup(msg.chat.id, msg.message_id);
     }
 
     await bot.sendMessage(
