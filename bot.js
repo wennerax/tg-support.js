@@ -195,32 +195,33 @@ bot.onText(/^\/(start)\b/i, async (msg) => {
   }
 });
 
-bot.onText(/^(?:!|\/)(бан|разбан|баны|помощь|help|ban|unban|bans)(?=\s|$)/i, async (msg, match) => {
+bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unban|bans)(?=\s|$)/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
   }
 
-  const command = String(match[1] || '').toLowerCase();
+  const hasBPrefix = String(match[1] || '').toLowerCase() === 'b';
+  const rawCommand = String(match[2] || '').toLowerCase();
+  const command = hasBPrefix ? `b${rawCommand}` : rawCommand;
   const text = msg.text || '';
-  const isRussianCommand = ['бан', 'разбан', 'баны'].includes(command);
 
-  if (command === 'help' || command === 'помощь') {
+  if (command === 'help' || command === 'помощь' || command === 'bhelp') {
     await bot.sendMessage(
       msg.chat.id,
-      '🛡️ Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!help\n\n🇬🇧 English aliases:\n/ban <@username> time reason\n/unban <@username>\n/bans\n/help'
+      '🛡️ Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!help\n\n🇬🇧 English aliases:\n/bban <@username> time reason\n/bunban <@username>\n/bbans\n/bhelp'
     );
     return;
   }
 
-  if (command === 'баны' || command === 'bans') {
+  if (command === 'баны' || command === 'bans' || command === 'bbans') {
     await bot.sendMessage(msg.chat.id, formatBanList());
     return;
   }
 
-  if (command === 'разбан' || command === 'unban') {
+  if (command === 'разбан' || command === 'unban' || command === 'bunban') {
     const username = extractMentionUsername(text);
     if (!username) {
-      await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /unban @username');
+      await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /bunban @username');
       return;
     }
 
@@ -230,7 +231,7 @@ bot.onText(/^(?:!|\/)(бан|разбан|баны|помощь|help|ban|unban|b
     return;
   }
 
-  if (command === 'бан' || command === 'ban') {
+  if (command === 'бан' || command === 'ban' || command === 'bban') {
     const args = text.split(/\s+/).slice(1);
     const username = extractMentionUsername(text);
     const duration = args.find((item) => parseDurationToMs(item));
@@ -240,7 +241,7 @@ bot.onText(/^(?:!|\/)(бан|разбан|баны|помощь|help|ban|unban|b
     if (!username || !duration) {
       await bot.sendMessage(
         msg.chat.id,
-        '⚠️ Формат: !бан <@username> 1h причина или /ban <@username> 1h reason'
+        '⚠️ Формат: !бан <@username> 1h причина или /bban <@username> 1h reason'
       );
       return;
     }
@@ -274,6 +275,11 @@ bot.on('callback_query', async (callbackQuery) => {
     return;
   }
 
+  if (question.closed) {
+    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Этот вопрос уже закрыт.' });
+    return;
+  }
+
   if (data.startsWith('answer:')) {
     const claimedBy = question.claimedBy;
     if (claimedBy && claimedBy !== callbackQuery.from.id) {
@@ -293,6 +299,23 @@ bot.on('callback_query', async (callbackQuery) => {
 
     await sendModeratorMessage(
       `Модератор ${await summarizeUser(callbackQuery.from)} взял вопрос в работу.`
+    );
+    return;
+  }
+
+  if (data.startsWith('close:')) {
+    question.closed = true;
+    question.closedBy = callbackQuery.from.id;
+    question.closedByName = callbackQuery.from.username || `id:${callbackQuery.from.id}`;
+    saveState();
+
+    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Вопрос закрыт.' });
+    await bot.editMessageReplyMarkup(
+      { inline_keyboard: [] },
+      {
+        chat_id: MODERATOR_GROUP_ID,
+        message_id: question.moderatorMessageId,
+      }
     );
     return;
   }
@@ -342,6 +365,7 @@ bot.on('message', async (msg) => {
         reply_markup: {
           inline_keyboard: [
             [{ text: 'Ответить', callback_data: `answer:${forwarded.message_id}` }],
+            [{ text: 'Закрыть', callback_data: `close:${forwarded.message_id}` }],
             [{ text: 'Забанить', callback_data: `ban:${forwarded.message_id}` }],
           ],
         },
@@ -369,6 +393,7 @@ bot.on('message', async (msg) => {
       moderatorMessageId: keyboardMessage.message_id,
       claimedBy: null,
       answered: false,
+      closed: false,
     };
     saveState();
     return;
@@ -391,8 +416,8 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  if (question.answered) {
-    await bot.sendMessage(msg.chat.id, '📌 Этот вопрос уже был обработан.');
+  if (question.answered || question.closed) {
+    await bot.sendMessage(msg.chat.id, question.closed ? '📌 Этот вопрос закрыт.' : '📌 Этот вопрос уже был обработан.');
     return;
   }
 
@@ -402,9 +427,9 @@ bot.on('message', async (msg) => {
   }
 
   try {
-    await bot.forwardMessage(question.userId, msg.chat.id, msg.message_id);
+    await bot.copyMessage(question.userId, msg.chat.id, msg.message_id);
   } catch (error) {
-    console.error('Failed to forward moderator answer to user:', error.message);
+    console.error('Failed to copy moderator answer to user:', error.message);
     await bot.sendMessage(msg.chat.id, '⚠️ Не удалось переслать ответ пользователю.');
     return;
   }
