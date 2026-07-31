@@ -129,7 +129,7 @@ bot.onText(/^\/(start)\b/i, async (msg) => {
   if (msg.chat.type === 'private') {
     await bot.sendMessage(
       msg.chat.id,
-      'Это помощник беседы БРЕДИМ.\nПишите вопросы, а наша модерация постарается ответить в кратчайшие сроки.'
+      '✨ Это помощник беседы БРЕДИМ.\n💬 Пишите вопросы, а наша модерация постарается ответить в кратчайшие сроки.'
     );
   }
 });
@@ -146,7 +146,7 @@ bot.onText(/^(?:!|\/)(бан|разбан|баны|help|ban|unban|bans|help)\b/i
   if (command === 'help' || command === 'помощь') {
     await bot.sendMessage(
       msg.chat.id,
-      'Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!help\n\nEnglish aliases:\n/ban <@username> time reason\n/unban <@username>\n/bans\n/help'
+      '🛡️ Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!help\n\n🇬🇧 English aliases:\n/ban <@username> time reason\n/unban <@username>\n/bans\n/help'
     );
     return;
   }
@@ -159,13 +159,13 @@ bot.onText(/^(?:!|\/)(бан|разбан|баны|help|ban|unban|bans|help)\b/i
   if (command === 'разбан' || command === 'unban') {
     const username = extractMentionUsername(text);
     if (!username) {
-      await bot.sendMessage(msg.chat.id, 'Формат: !разбан @username или /unban @username');
+      await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /unban @username');
       return;
     }
 
     const user = { username };
     unbanUser(user);
-    await bot.sendMessage(msg.chat.id, `Пользователь @${username} разбанен.`);
+    await bot.sendMessage(msg.chat.id, `✅ Пользователь @${username} разбанен.`);
     return;
   }
 
@@ -179,14 +179,14 @@ bot.onText(/^(?:!|\/)(бан|разбан|баны|help|ban|unban|bans|help)\b/i
     if (!username || !duration) {
       await bot.sendMessage(
         msg.chat.id,
-        'Формат: !бан <@username> 1h причина или /ban <@username> 1h reason'
+        '⚠️ Формат: !бан <@username> 1h причина или /ban <@username> 1h reason'
       );
       return;
     }
 
     const ms = parseDurationToMs(duration);
     if (!ms) {
-      await bot.sendMessage(msg.chat.id, 'Некорректное время. Примеры: 10m, 1h, 1d.');
+      await bot.sendMessage(msg.chat.id, '⏰ Некорректное время. Примеры: 10m, 1h, 1d.');
       return;
     }
 
@@ -198,7 +198,7 @@ bot.onText(/^(?:!|\/)(бан|разбан|баны|help|ban|unban|bans|help)\b/i
 
     await bot.sendMessage(
       msg.chat.id,
-      `Пользователь @${username} заблокирован на ${duration}. Причина: ${reason}`
+      `⛔ Пользователь @${username} заблокирован на ${duration}. Причина: ${reason}`
     );
   }
 });
@@ -262,7 +262,7 @@ bot.on('message', async (msg) => {
 
   if (msg.chat.type === 'private') {
     if (isBanned(msg.from)) {
-      await bot.sendMessage(msg.chat.id, 'Вы забанены и не можете отправлять вопросы боту.');
+      await bot.sendMessage(msg.chat.id, '🚫 Вы забанены и не можете отправлять вопросы боту.');
       return;
     }
 
@@ -280,6 +280,11 @@ bot.on('message', async (msg) => {
           ],
         },
       }
+    );
+
+    await bot.sendMessage(
+      msg.chat.id,
+      '📨 Ваш вопрос отправлен. Пожалуйста, подождите ответа модерации.'
     );
 
     state.questions[String(keyboardMessage.message_id)] = {
@@ -313,12 +318,12 @@ bot.on('message', async (msg) => {
   }
 
   if (question.answered) {
-    await bot.sendMessage(msg.chat.id, 'Этот вопрос уже был обработан.');
+    await bot.sendMessage(msg.chat.id, '📌 Этот вопрос уже был обработан.');
     return;
   }
 
   if (question.claimedBy && question.claimedBy !== msg.from.id) {
-    await bot.sendMessage(msg.chat.id, 'Этот вопрос уже взят в работу другим модератором.');
+    await bot.sendMessage(msg.chat.id, '🧑‍💼 Этот вопрос уже взят в работу другим модератором.');
     return;
   }
 
@@ -332,7 +337,7 @@ bot.on('message', async (msg) => {
   );
   question.answered = true;
   saveState();
-  await bot.sendMessage(msg.chat.id, 'Ответ переслан пользователю.');
+  await bot.sendMessage(msg.chat.id, '✅ Ответ переслан пользователю.');
 });
 
 bot.on('polling_error', (error) => {
