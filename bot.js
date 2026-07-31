@@ -125,6 +125,15 @@ async function summarizeUser(user) {
   return username;
 }
 
+bot.onText(/^\/(start)\b/i, async (msg) => {
+  if (msg.chat.type === 'private') {
+    await bot.sendMessage(
+      msg.chat.id,
+      'Это помощник беседы БРЕДИМ.\nПишите вопросы, а наша модерация постарается ответить в кратчайшие сроки.'
+    );
+  }
+});
+
 bot.onText(/^(?:!|\/)(бан|разбан|баны|help|ban|unban|bans|help)\b/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
@@ -247,6 +256,10 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  if (msg.chat.type === 'private' && /^\/(start)\b/i.test(msg.text || '')) {
+    return;
+  }
+
   if (msg.chat.type === 'private') {
     if (isBanned(msg.from)) {
       await bot.sendMessage(msg.chat.id, 'Вы забанены и не можете отправлять вопросы боту.');
@@ -274,6 +287,7 @@ bot.on('message', async (msg) => {
       userUsername: msg.from.username || null,
       originalMessageId: msg.message_id,
       forwardedMessageId: forwarded.message_id,
+      moderatorMessageId: keyboardMessage.message_id,
       claimedBy: null,
       answered: false,
     };
@@ -309,6 +323,13 @@ bot.on('message', async (msg) => {
   }
 
   await bot.forwardMessage(question.userId, msg.chat.id, msg.message_id);
+  await bot.editMessageReplyMarkup(
+    { inline_keyboard: [] },
+    {
+      chat_id: MODERATOR_GROUP_ID,
+      message_id: question.moderatorMessageId,
+    }
+  );
   question.answered = true;
   saveState();
   await bot.sendMessage(msg.chat.id, 'Ответ переслан пользователю.');
