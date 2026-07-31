@@ -183,16 +183,6 @@ async function sendModeratorMessage(text, options = {}) {
   }
 }
 
-async function forwardToModeratorGroup(chatId, messageId) {
-  try {
-    const forwarded = await bot.forwardMessage(MODERATOR_GROUP_ID, chatId, messageId);
-    return forwarded;
-  } catch (error) {
-    console.error('Failed to forward message to moderator group:', error.message);
-    return null;
-  }
-}
-
 bot.onText(/^\/(start)\b/i, async (msg) => {
   if (msg.chat.type === 'private') {
     await bot.sendMessage(
@@ -381,19 +371,48 @@ bot.on('message', async (msg) => {
 
     const hasMedia = Boolean(msg.photo || msg.sticker || msg.video || msg.voice || msg.document || msg.audio || msg.video_note || msg.animation || msg.contact);
     const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || msg.caption || '')}`;
-    const keyboardMessage = await sendModeratorMessage(
-      questionText,
-      {
+    const keyboardMarkup = {
+      inline_keyboard: [
+        [{ text: 'Ответить', callback_data: `answer:${msg.message_id}` }],
+        [{ text: 'Закрыть', callback_data: `close:${msg.message_id}` }],
+        [{ text: 'Забанить', callback_data: `ban:${msg.message_id}` }],
+      ],
+    };
+
+    let keyboardMessage = null;
+
+    if (hasMedia) {
+      const mediaOptions = {
+        caption: questionText,
         parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: 'Ответить', callback_data: `answer:${msg.message_id}` }],
-            [{ text: 'Закрыть', callback_data: `close:${msg.message_id}` }],
-            [{ text: 'Забанить', callback_data: `ban:${msg.message_id}` }],
-          ],
-        },
+        reply_markup: keyboardMarkup,
+      };
+
+      if (msg.photo) {
+        keyboardMessage = await bot.sendPhoto(MODERATOR_GROUP_ID, msg.photo[msg.photo.length - 1].file_id, mediaOptions);
+      } else if (msg.video) {
+        keyboardMessage = await bot.sendVideo(MODERATOR_GROUP_ID, msg.video.file_id, mediaOptions);
+      } else if (msg.document) {
+        keyboardMessage = await bot.sendDocument(MODERATOR_GROUP_ID, msg.document.file_id, mediaOptions);
+      } else if (msg.audio) {
+        keyboardMessage = await bot.sendAudio(MODERATOR_GROUP_ID, msg.audio.file_id, mediaOptions);
+      } else if (msg.voice) {
+        keyboardMessage = await bot.sendVoice(MODERATOR_GROUP_ID, msg.voice.file_id, mediaOptions);
+      } else if (msg.animation) {
+        keyboardMessage = await bot.sendAnimation(MODERATOR_GROUP_ID, msg.animation.file_id, mediaOptions);
+      } else if (msg.video_note) {
+        keyboardMessage = await bot.sendVideoNote(MODERATOR_GROUP_ID, msg.video_note.file_id, { reply_markup: keyboardMarkup });
+      } else if (msg.contact) {
+        keyboardMessage = await bot.sendContact(MODERATOR_GROUP_ID, msg.contact.phone_number, msg.contact.first_name, {
+          last_name: msg.contact.last_name,
+          reply_markup: keyboardMarkup,
+        });
+      } else {
+        keyboardMessage = await sendModeratorMessage(questionText, { parse_mode: 'HTML', reply_markup: keyboardMarkup });
       }
-    );
+    } else {
+      keyboardMessage = await sendModeratorMessage(questionText, { parse_mode: 'HTML', reply_markup: keyboardMarkup });
+    }
 
     if (!keyboardMessage) {
       await bot.sendMessage(
@@ -401,12 +420,6 @@ bot.on('message', async (msg) => {
         '⚠️ Модерационная группа сейчас недоступна. Попробуйте позже.'
       );
       return;
-    }
-
-    let forwardedMediaMessageId = null;
-    if (hasMedia) {
-      const forwardedMedia = await forwardToModeratorGroup(msg.chat.id, msg.message_id);
-      forwardedMediaMessageId = forwardedMedia?.message_id || null;
     }
 
     await bot.sendMessage(
@@ -423,7 +436,6 @@ bot.on('message', async (msg) => {
       claimedBy: null,
       answered: false,
       closed: false,
-      forwardedMediaMessageId,
     };
     saveState();
     return;
@@ -519,14 +531,6 @@ bot.on('message', async (msg) => {
       await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
     } catch (error) {
       console.error('Failed to delete moderator question message:', error.message);
-    }
-
-    if (question.forwardedMediaMessageId) {
-      try {
-        await bot.deleteMessage(MODERATOR_GROUP_ID, question.forwardedMediaMessageId);
-      } catch (error) {
-        console.error('Failed to delete forwarded media message:', error.message);
-      }
     }
   }
 
