@@ -134,7 +134,7 @@ bot.onText(/^\/(start)\b/i, async (msg) => {
   }
 });
 
-bot.onText(/^(?:!|\/)(бан|разбан|баны|help|ban|unban|bans|help)\b/i, async (msg, match) => {
+bot.onText(/^(?:!|\/)(бан|разбан|баны|помощь|help|ban|unban|bans)\b/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
   }
