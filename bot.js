@@ -183,6 +183,22 @@ async function sendModeratorMessage(text, options = {}) {
   }
 }
 
+async function tryDeleteMessage(chatId, messageId) {
+  try {
+    await bot.deleteMessage(chatId, messageId);
+    return true;
+  } catch (error) {
+    const description = String(error?.response?.description || error.message || '');
+    const isPermissionIssue = /message can't be deleted|not enough rights|delete messages|not a chat admin/i.test(description);
+    if (isPermissionIssue) {
+      console.warn(`Cannot delete message ${chatId}/${messageId}: ${description}`);
+    } else if (!/message to delete not found|message not found/i.test(description)) {
+      console.error(`Failed to delete message ${chatId}/${messageId}: ${description}`);
+    }
+    return false;
+  }
+}
+
 bot.onText(/^\/(start)\b/i, async (msg) => {
   if (msg.chat.type === 'private') {
     await bot.sendMessage(
@@ -328,11 +344,7 @@ bot.on('callback_query', async (callbackQuery) => {
     saveState();
 
     await bot.answerCallbackQuery(callbackQuery.id, { text: 'Вопрос закрыт.' });
-    try {
-      await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
-    } catch (error) {
-      console.error('Failed to delete closed question message:', error.message);
-    }
+    await tryDeleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
     return;
   }
 
@@ -522,31 +534,19 @@ bot.on('message', async (msg) => {
   }
 
   if (sentUserReply) {
-    try {
-      await bot.deleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
-    } catch (error) {
-      console.error('Failed to delete moderator question message:', error.message);
-    }
+    await tryDeleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
 
     if (question.claimedNoticeMessageId) {
-      try {
-        await bot.deleteMessage(MODERATOR_GROUP_ID, question.claimedNoticeMessageId);
-      } catch (error) {
-        console.error('Failed to delete claimed question notice:', error.message);
-      }
+      await tryDeleteMessage(MODERATOR_GROUP_ID, question.claimedNoticeMessageId);
     }
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        if (attempt > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-        await bot.deleteMessage(MODERATOR_GROUP_ID, msg.message_id);
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      const deleted = await tryDeleteMessage(MODERATOR_GROUP_ID, msg.message_id);
+      if (deleted) {
         break;
-      } catch (error) {
-        if (attempt === 2) {
-          console.error('Failed to delete moderator reply message:', error.message);
-        }
       }
     }
   }
@@ -555,11 +555,7 @@ bot.on('message', async (msg) => {
   saveState();
   const confirmationMessage = await bot.sendMessage(msg.chat.id, '✅ Ответ переслан пользователю.');
   setTimeout(async () => {
-    try {
-      await bot.deleteMessage(msg.chat.id, confirmationMessage.message_id);
-    } catch (error) {
-      console.error('Failed to delete confirmation message:', error.message);
-    }
+    await tryDeleteMessage(msg.chat.id, confirmationMessage.message_id);
   }, 5000);
 });
 
