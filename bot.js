@@ -536,10 +536,18 @@ bot.on('message', async (msg) => {
       }
     }
 
-    try {
-      await bot.deleteMessage(MODERATOR_GROUP_ID, msg.message_id);
-    } catch (error) {
-      console.error('Failed to delete moderator reply message:', error.message);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        await bot.deleteMessage(MODERATOR_GROUP_ID, msg.message_id);
+        break;
+      } catch (error) {
+        if (attempt === 2) {
+          console.error('Failed to delete moderator reply message:', error.message);
+        }
+      }
     }
   }
 
