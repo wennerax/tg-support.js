@@ -234,20 +234,23 @@ bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unb
   if (command === 'бан' || command === 'ban' || command === 'bban') {
     const args = text.split(/\s+/).slice(1);
     const username = extractMentionUsername(text);
-    const duration = args.find((item) => parseDurationToMs(item));
-    const reasonParts = duration ? args.slice(args.indexOf(duration) + 1) : [];
+    const durationArg = args.find((item) => parseDurationToMs(item));
+    const durationIndex = durationArg ? args.indexOf(durationArg) : -1;
+    const reasonParts = durationIndex >= 0 ? args.slice(durationIndex + 1) : args.slice(1);
     const reason = reasonParts.join(' ') || 'без причины';
 
-    if (!username || !duration) {
+    if (!username) {
       await bot.sendMessage(
         msg.chat.id,
-        '⚠️ Формат: !бан <@username> 1h причина или /bban <@username> 1h reason'
+        '⚠️ Формат: !бан <@username> [время] [причина] или /bban <@username> [time] [reason]'
       );
       return;
     }
 
-    const ms = parseDurationToMs(duration);
-    if (!ms) {
+    const ms = durationArg ? parseDurationToMs(durationArg) : null;
+    const until = ms ? Date.now() + ms : null;
+
+    if (durationArg && !ms) {
       await bot.sendMessage(msg.chat.id, '⏰ Некорректное время. Примеры: 10m, 1h, 1d.');
       return;
     }
@@ -255,12 +258,13 @@ bot.onText(/^(?:!|\/)(b?)(бан|разбан|баны|помощь|help|ban|unb
     banUser({
       user: { username },
       reason,
-      until: Date.now() + ms,
+      until,
     });
 
+    const durationText = durationArg || 'навсегда';
     await bot.sendMessage(
       msg.chat.id,
-      `⛔ Пользователь @${username} заблокирован на ${duration}. Причина: ${reason}`
+      `⛔ Пользователь @${username} заблокирован на ${durationText}. Причина: ${reason}`
     );
   }
 });
@@ -310,6 +314,13 @@ bot.on('callback_query', async (callbackQuery) => {
     saveState();
 
     await bot.answerCallbackQuery(callbackQuery.id, { text: 'Вопрос закрыт.' });
+    await bot.editMessageText(
+      '🔒 Закрытый вопрос',
+      {
+        chat_id: MODERATOR_GROUP_ID,
+        message_id: question.moderatorMessageId,
+      }
+    );
     await bot.editMessageReplyMarkup(
       { inline_keyboard: [] },
       {
