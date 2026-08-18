@@ -333,6 +333,9 @@ bot.on('callback_query', async (callbackQuery) => {
     if (claimMessage?.message_id) {
       question.claimedNoticeMessageId = claimMessage.message_id;
       saveState();
+      setTimeout(async () => {
+        await tryDeleteMessage(MODERATOR_GROUP_ID, claimMessage.message_id);
+      }, 2000);
     }
     return;
   }
@@ -440,6 +443,7 @@ bot.on('message', async (msg) => {
       originalMessageId: msg.message_id,
       forwardedMessageId: msg.message_id,
       moderatorMessageId: keyboardMessage.message_id,
+      originalQuestionText: String(msg.text || msg.caption || '').trim(),
       claimedBy: null,
       answered: false,
       closed: false,
@@ -533,23 +537,18 @@ bot.on('message', async (msg) => {
     console.error('Failed to clear moderator keyboard:', error.message);
   }
 
-  if (sentUserReply) {
-    await tryDeleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
+  const summaryText = [
+    'Рассмотренный вопрос',
+    `От кого: ${question.userUsername ? `@${question.userUsername}` : `id:${question.userId}`}`,
+    'Вопрос:',
+    `${escapeHtml(question.originalQuestionText || '—')}`,
+    'Ответ модератора',
+    `Модератор: ${msg.from.username ? `@${msg.from.username}` : `id:${msg.from.id}`}`,
+    'Ответ:',
+    `${escapeHtml(msg.text || msg.caption || 'Медиа-файл')}`,
+  ].join('\n');
 
-    if (question.claimedNoticeMessageId) {
-      await tryDeleteMessage(MODERATOR_GROUP_ID, question.claimedNoticeMessageId);
-    }
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (attempt > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-      const deleted = await tryDeleteMessage(MODERATOR_GROUP_ID, msg.message_id);
-      if (deleted) {
-        break;
-      }
-    }
-  }
+  await sendModeratorMessage(summaryText, { parse_mode: 'HTML' });
 
   question.answered = true;
   saveState();
