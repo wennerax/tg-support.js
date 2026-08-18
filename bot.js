@@ -221,7 +221,7 @@ bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|hel
   if (command === 'help' || command === 'помощь' || command === 'хелп' || command === 'hhelp') {
     await bot.sendMessage(
       msg.chat.id,
-      '🛡️ Команды для модераторов:\n!бан <@username> время причина\n!разбан <@username>\n!баны\n!помощь\n!хелп\n\n🇬🇧 English aliases:\n/hban <@username> time reason\n/hunban <@username>\n/hbans\n/hhelp'
+      '🛡️ Команды для модераторов:\n🧾 !бан <@username> время причина\n🔓 !разбан <@username>\n📋 !баны\n❓ !помощь\n❔ !хелп\n\n🇬🇧 English aliases:\n🧾 /hban <@username> time reason\n🔓 /hunban <@username>\n📋 /hbans\n❓ /hhelp'
     );
     return;
   }
@@ -244,13 +244,13 @@ bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|hel
 
     const username = extractMentionUsername(text);
     if (!username) {
-      await bot.sendMessage(msg.chat.id, '⚠️ Формат: !разбан @username или /hunban @username');
+      await bot.sendMessage(msg.chat.id, '⚠️ Формат: 🔓 !разбан @username или /hunban @username');
       return;
     }
 
     const user = { username };
     unbanUser(user);
-    await bot.sendMessage(msg.chat.id, `✅ Пользователь @${username} разбанен.`);
+    await bot.sendMessage(msg.chat.id, `✅🔓 Пользователь @${username} разбанен.`);
     return;
   }
 
@@ -268,7 +268,7 @@ bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|hel
     if (!username) {
       await bot.sendMessage(
         msg.chat.id,
-        '⚠️ Формат: !бан <@username> [время] [причина] или /hban <@username> [time] [reason]'
+        '⚠️ Формат: 🧾 !бан <@username> [время] [причина] или /hban <@username> [time] [reason]'
       );
       return;
     }
@@ -290,7 +290,7 @@ bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|hel
     const durationText = durationArg || 'навсегда';
     await bot.sendMessage(
       msg.chat.id,
-      `⛔ Пользователь @${username} заблокирован на ${durationText}. Причина: ${reason}`
+      `⛔🚫 Пользователь @${username} заблокирован на ${durationText}. Причина: ${reason}`
     );
   }
 });
@@ -301,12 +301,12 @@ bot.on('callback_query', async (callbackQuery) => {
   const question = state.questions[String(messageId)];
 
   if (!question) {
-    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Эта запись уже недоступна.' });
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Эта запись уже недоступна.' });
     return;
   }
 
   if (question.closed) {
-    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Этот вопрос уже закрыт.' });
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '📌🔒 Этот вопрос уже закрыт.' });
     return;
   }
 
@@ -314,7 +314,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const claimedBy = question.claimedBy;
     if (claimedBy && claimedBy !== callbackQuery.from.id) {
       await bot.answerCallbackQuery(callbackQuery.id, {
-        text: `Этот вопрос уже взял модератор ${claimedBy}.`,
+        text: `🧑‍💼⏳ Этот вопрос уже взял модератор ${claimedBy}.`,
       });
       return;
     }
@@ -324,18 +324,15 @@ bot.on('callback_query', async (callbackQuery) => {
     saveState();
 
     await bot.answerCallbackQuery(callbackQuery.id, {
-      text: `Вы взяли вопрос в работу. Теперь ответьте на это сообщение в группе.`
+      text: `✅ Вы взяли вопрос в работу. Теперь ответьте на это сообщение в группе.`
     });
 
     const claimMessage = await sendModeratorMessage(
-      `Модератор ${await summarizeUser(callbackQuery.from)} взял вопрос в работу.`
+      `🟢 Модератор ${await summarizeUser(callbackQuery.from)} взял вопрос в работу.`
     );
     if (claimMessage?.message_id) {
       question.claimedNoticeMessageId = claimMessage.message_id;
       saveState();
-      setTimeout(async () => {
-        await tryDeleteMessage(MODERATOR_GROUP_ID, claimMessage.message_id);
-      }, 2000);
     }
     return;
   }
@@ -346,7 +343,7 @@ bot.on('callback_query', async (callbackQuery) => {
     question.closedByName = callbackQuery.from.username || `id:${callbackQuery.from.id}`;
     saveState();
 
-    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Вопрос закрыт.' });
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Вопрос закрыт.' });
     await tryDeleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
     return;
   }
@@ -355,10 +352,10 @@ bot.on('callback_query', async (callbackQuery) => {
     const user = { id: question.userId, username: question.userUsername };
     banUser({ user, reason: 'модератором через кнопку ban', until: null });
     await bot.answerCallbackQuery(callbackQuery.id, {
-      text: `Пользователь ${await summarizeUser(user)} забанен.`,
+      text: `🚫 Пользователь ${await summarizeUser(user)} забанен.`,
     });
     await sendModeratorMessage(
-      `Пользователь ${await summarizeUser(user)} забанен модератором ${await summarizeUser(callbackQuery.from)}.`
+      `🚫 Пользователь ${await summarizeUser(user)} забанен модератором ${await summarizeUser(callbackQuery.from)}.`
     );
     return;
   }
@@ -375,7 +372,7 @@ bot.on('message', async (msg) => {
 
   if (msg.chat.type === 'private') {
     if (isBanned(msg.from)) {
-      await bot.sendMessage(msg.chat.id, '🚫 Вы забанены и не можете отправлять вопросы боту.');
+      await bot.sendMessage(msg.chat.id, '🚫⛔ Вы забанены и не можете отправлять вопросы боту.');
       return;
     }
 
@@ -383,9 +380,9 @@ bot.on('message', async (msg) => {
     const questionText = `Новый вопрос от ${await summarizeUser(msg.from)}\n${escapeHtml(msg.text || msg.caption || '')}`;
     const keyboardMarkup = {
       inline_keyboard: [
-        [{ text: 'Ответить', callback_data: `answer:${msg.message_id}` }],
-        [{ text: 'Закрыть', callback_data: `close:${msg.message_id}` }],
-        [{ text: 'Забанить', callback_data: `ban:${msg.message_id}` }],
+        [{ text: '💬 Ответить', callback_data: `answer:${msg.message_id}` }],
+        [{ text: '✅ Закрыть', callback_data: `close:${msg.message_id}` }],
+        [{ text: '🚫 Забанить', callback_data: `ban:${msg.message_id}` }],
       ],
     };
 
@@ -427,14 +424,14 @@ bot.on('message', async (msg) => {
     if (!keyboardMessage) {
       await bot.sendMessage(
         msg.chat.id,
-        '⚠️ Модерационная группа сейчас недоступна. Попробуйте позже.'
+        '⚠️🚫 Модерационная группа сейчас недоступна. Попробуйте позже.'
       );
       return;
     }
 
     await bot.sendMessage(
       msg.chat.id,
-      '📨 Ваш вопрос отправлен. Пожалуйста, подождите ответа модерации.'
+      '📨✅ Ваш вопрос отправлен. Пожалуйста, подождите ответа модерации.'
     );
 
     state.questions[String(keyboardMessage.message_id)] = {
@@ -470,12 +467,12 @@ bot.on('message', async (msg) => {
   }
 
   if (question.answered || question.closed) {
-    await bot.sendMessage(msg.chat.id, question.closed ? '📌 Этот вопрос закрыт.' : '📌 Этот вопрос уже был обработан.');
+    await bot.sendMessage(msg.chat.id, question.closed ? '📌🔒 Этот вопрос закрыт.' : '📌✅ Этот вопрос уже был обработан.');
     return;
   }
 
   if (question.claimedBy && question.claimedBy !== msg.from.id) {
-    await bot.sendMessage(msg.chat.id, '🧑‍💼 Этот вопрос уже взят в работу другим модератором.');
+    await bot.sendMessage(msg.chat.id, '🧑‍💼⏳ Этот вопрос уже взят в работу другим модератором.');
     return;
   }
 
@@ -492,19 +489,19 @@ bot.on('message', async (msg) => {
       };
 
       if (msg.photo) {
-        await bot.sendPhoto(question.userId, msg.photo[msg.photo.length - 1].file_id, { caption: 'Модератор' });
+        await bot.sendPhoto(question.userId, msg.photo[msg.photo.length - 1].file_id, { caption: '🟢 Модератор' });
       } else if (msg.video) {
-        await bot.sendVideo(question.userId, msg.video.file_id, { caption: 'Модератор' });
+        await bot.sendVideo(question.userId, msg.video.file_id, { caption: '🟢 Модератор' });
       } else if (msg.document) {
-        await bot.sendDocument(question.userId, msg.document.file_id, { caption: 'Модератор' });
+        await bot.sendDocument(question.userId, msg.document.file_id, { caption: '🟢 Модератор' });
       } else if (msg.audio) {
-        await bot.sendAudio(question.userId, msg.audio.file_id, { caption: 'Модератор' });
+        await bot.sendAudio(question.userId, msg.audio.file_id, { caption: '🟢 Модератор' });
       } else if (msg.voice) {
-        await bot.sendVoice(question.userId, msg.voice.file_id, { caption: 'Модератор' });
+        await bot.sendVoice(question.userId, msg.voice.file_id, { caption: '🟢 Модератор' });
       } else if (msg.sticker) {
         await bot.sendSticker(question.userId, msg.sticker.file_id);
       } else if (msg.animation) {
-        await bot.sendAnimation(question.userId, msg.animation.file_id, { caption: 'Модератор' });
+        await bot.sendAnimation(question.userId, msg.animation.file_id, { caption: '🟢 Модератор' });
       } else if (msg.video_note) {
         await bot.sendVideoNote(question.userId, msg.video_note.file_id);
       } else if (msg.contact) {
@@ -513,15 +510,15 @@ bot.on('message', async (msg) => {
 
       sentUserReply = true;
     } else if (replyText) {
-      await bot.sendMessage(question.userId, `Модератор: "${escapeHtml(replyText)}"`, { parse_mode: 'HTML' });
+      await bot.sendMessage(question.userId, `🟢 Модератор: "${escapeHtml(replyText)}"`, { parse_mode: 'HTML' });
       sentUserReply = true;
     } else {
-      await bot.sendMessage(question.userId, 'Модератор: ""');
+      await bot.sendMessage(question.userId, '🟢 Модератор: ""');
       sentUserReply = true;
     }
   } catch (error) {
     console.error('Failed to send moderator answer to user:', error.message);
-    await bot.sendMessage(msg.chat.id, '⚠️ Не удалось переслать ответ пользователю.');
+    await bot.sendMessage(msg.chat.id, '⚠️❌ Не удалось переслать ответ пользователю.');
     return;
   }
 
@@ -538,21 +535,27 @@ bot.on('message', async (msg) => {
   }
 
   const summaryText = [
-    'Рассмотренный вопрос',
-    `От кого: ${question.userUsername ? `@${question.userUsername}` : `id:${question.userId}`}`,
-    'Вопрос:',
+    '📌 Рассмотренный вопрос',
+    `👤 От кого: ${question.userUsername ? `@${question.userUsername}` : `id:${question.userId}`}`,
+    '💬 Вопрос:',
     `${escapeHtml(question.originalQuestionText || '—')}`,
-    'Ответ модератора',
-    `Модератор: ${msg.from.username ? `@${msg.from.username}` : `id:${msg.from.id}`}`,
-    'Ответ:',
-    `${escapeHtml(msg.text || msg.caption || 'Медиа-файл')}`,
+    '🛠️ Ответ модератора',
+    `🟢 Модератор: ${msg.from.username ? `@${msg.from.username}` : `id:${msg.from.id}`}`,
+    '✉️ Ответ:',
+    `${escapeHtml(msg.text || msg.caption || '📎 Медиа-файл')}`,
   ].join('\n');
 
   await sendModeratorMessage(summaryText, { parse_mode: 'HTML' });
 
+  if (question.claimedNoticeMessageId) {
+    setTimeout(async () => {
+      await tryDeleteMessage(MODERATOR_GROUP_ID, question.claimedNoticeMessageId);
+    }, 2000);
+  }
+
   question.answered = true;
   saveState();
-  const confirmationMessage = await bot.sendMessage(msg.chat.id, '✅ Ответ переслан пользователю.');
+  const confirmationMessage = await bot.sendMessage(msg.chat.id, '✅📬 Ответ переслан пользователю.');
   setTimeout(async () => {
     await tryDeleteMessage(msg.chat.id, confirmationMessage.message_id);
   }, 5000);
