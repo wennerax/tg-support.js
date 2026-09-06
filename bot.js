@@ -546,6 +546,7 @@ bot.on('message', async (msg) => {
   ].join('\n');
 
   await sendModeratorMessage(summaryText, { parse_mode: 'HTML' });
+  await tryDeleteMessage(MODERATOR_GROUP_ID, question.moderatorMessageId);
 
   if (question.claimedNoticeMessageId) {
     setTimeout(async () => {
