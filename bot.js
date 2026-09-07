@@ -14,7 +14,7 @@ if (!token || !MODERATOR_GROUP_ID) {
 
 const DATA_DIR = path.join(__dirname, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
-const DEFAULT_STATE = { bans: {}, questions: {} };
+const DEFAULT_STATE = { bans: {}, questions: {}, antispam: {}, antiflood: {} };
 
 const bot = new TelegramBot(token, { polling: true });
 let state = loadState();
@@ -33,6 +33,8 @@ function loadState() {
     return {
       bans: parsed.bans || {},
       questions: parsed.questions || {},
+      antispam: parsed.antispam || {},
+      antiflood: parsed.antiflood || {},
     };
   } catch (error) {
     console.error('Failed to load state:', error.message);
@@ -40,6 +42,221 @@ function loadState() {
   }
 }
 
+function getAntispamSettings(chatId) {
+  const key = String(chatId);
+  state.antispam[key] = {
+    enabled: false,
+    maxMessages: 7,
+    intervalSeconds: 3,
+    punishment: 'allow',
+    deleteMessages: true,
+    ...(state.antispam[key] || {}),
+  };
+  return state.antispam[key];
+}
+
+function getAntifloodSettings(chatId) {
+  const key = String(chatId);
+  state.antiflood[key] = {
+    enabled: false,
+    maxCharacters: 20,
+    punishment: 'mute',
+    ...(state.antiflood[key] || {}),
+  };
+  return state.antiflood[key];
+}
+
+function punishmentDuration() {
+  return Math.floor(Date.now() / 1000) + 4 * 60 * 60;
+}
+
+function applyPunishmentOptions(settings) {
+  if (settings.punishment === 'mute') {
+    return {
+      type: 'mute',
+      options: {
+        can_send_messages: false,
+        can_send_audios: false,
+        can_send_documents: false,
+        can_send_photos: false,
+        can_send_videos: false,
+        can_send_video_notes: false,
+        can_send_voice_notes: false,
+        can_send_polls: false,
+        can_send_other_messages: false,
+        until_date: punishmentDuration(),
+      },
+    };
+  }
+  if (settings.punishment === 'ban') {
+    return { type: 'ban', options: { until_date: punishmentDuration() } };
+  }
+  return null;
+}
+
+function antifloodSettingsText(settings) {
+  return [
+    '🌊 Настройки антифлуда',
+    '',
+    `Состояние: ${settings.enabled ? '✅ включен' : '❌ выключен'}`,
+    `Максимум символов в одном сообщении: ${settings.maxCharacters}`,
+    `Наказание: ${settings.punishment === 'ban' ? '🚫 Заблокировать' : '🔇 Замутить'}`,
+    'Срок наказания: 4 часа',
+  ].join('\n');
+}
+
+function antifloodSettingsKeyboard(settings) {
+  return {
+    inline_keyboard: [
+      [{ text: '🔤 Символы', callback_data: 'antiflood:characters' }],
+      [{ text: settings.enabled ? '❌ Выключить антифлуд' : '✅ Включить антифлуд', callback_data: 'antiflood:toggle' }],
+      [
+        { text: '🔇 Мут', callback_data: 'antiflood:punishment:mute' },
+        { text: '🚫 Бан', callback_data: 'antiflood:punishment:ban' },
+      ],
+      [{ text: '⬅️ Назад', callback_data: 'menu:main' }],
+    ],
+  };
+}
+
+function antifloodCharactersKeyboard() {
+  const values = [5, 10, 15, 20, 25, 30, 35];
+  return {
+    inline_keyboard: [
+      values.slice(0, 4).map((value) => ({ text: String(value), callback_data: `antiflood:set-characters:${value}` })),
+      values.slice(4).map((value) => ({ text: String(value), callback_data: `antiflood:set-characters:${value}` })),
+      [{ text: '⬅️ Назад', callback_data: 'menu:antiflood' }],
+    ],
+  };
+}
+
+function antispamSettingsText(settings) {
+  const punishment = {
+    allow: '❗ Исключить',
+    mute: '🔇 Замутить',
+    ban: '🚫 Заблокировать',
+  }[settings.punishment] || '❗ Исключить';
+
+  return [
+    '🛡️ Настройки антиспама',
+    '',
+    `Состояние: ${settings.enabled ? '✅ включен' : '❌ выключен'}`,
+    `Антиспам срабатывает при отправке ${settings.maxMessages} сообщений за ${settings.intervalSeconds} сек.`,
+    `Наказание: ${punishment}`,
+    `Удалять сообщения: ${settings.deleteMessages ? '✅ да' : '❌ нет'}`,
+  ].join('\n');
+}
+
+function antispamSettingsKeyboard(settings) {
+  return {
+    inline_keyboard: [
+      [
+        { text: '💬 Сообщения', callback_data: 'antispam:messages' },
+        { text: '🕘 Время', callback_data: 'antispam:interval' },
+      ],
+      [
+        { text: settings.enabled ? '❌ Выключить антиспам' : '✅ Включить антиспам', callback_data: 'antispam:toggle' },
+      ],
+      [{ text: '🌊 Антифлуд', callback_data: 'menu:antiflood' }],
+      [
+        { text: '❗ Исключить', callback_data: 'antispam:punishment:allow' },
+        { text: '🔇 Замутить', callback_data: 'antispam:punishment:mute' },
+        { text: '🚫 Заблокировать', callback_data: 'antispam:punishment:ban' },
+      ],
+      [{ text: `🗑️ Удалять сообщения: ${settings.deleteMessages ? 'да' : 'нет'}`, callback_data: 'antispam:delete' }],
+      [{ text: '⬅️ Назад', callback_data: 'menu:main' }],
+    ],
+  };
+}
+
+function numberSelectionKeyboard(type) {
+  const values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20];
+  const rows = [];
+  for (let index = 0; index < values.length; index += 4) {
+    rows.push(values.slice(index, index + 4).map((value) => ({
+      text: String(value),
+      callback_data: `antispam:${type === 'messages' ? 'set-messages' : 'set-interval'}:${value}`,
+    })));
+  }
+  rows.push([{ text: '⬅️ Назад', callback_data: 'menu:antispam' }]);
+  return { inline_keyboard: rows };
+}
+
+const antispamCounters = new Map();
+
+function antispamCountersFor(chatId) {
+  if (!antispamCounters.has(chatId)) antispamCounters.set(chatId, new Map());
+  return antispamCounters.get(chatId);
+}
+
+function mainMenuKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: '🛡️ Настройки антиспама', callback_data: 'menu:antispam' }],
+    ],
+  };
+}
+
+async function handleAntispamMessage(msg) {
+  if (msg.chat.id !== MODERATOR_GROUP_ID || !msg.from || msg.from.is_bot) return false;
+
+  const settings = getAntispamSettings(msg.chat.id);
+  if (!settings.enabled) return false;
+
+  const now = Date.now();
+  const counters = antispamCountersFor(msg.chat.id);
+  const userKey = String(msg.from.id);
+  const recentMessages = (counters.get(userKey) || []).filter(
+    (entry) => now - entry.createdAt < settings.intervalSeconds * 1000
+  );
+  recentMessages.push({ createdAt: now, messageId: msg.message_id });
+  counters.set(userKey, recentMessages);
+
+  if (recentMessages.length < settings.maxMessages) return false;
+  counters.delete(userKey);
+
+  if (settings.deleteMessages) {
+    await Promise.all(recentMessages.map((entry) => tryDeleteMessage(msg.chat.id, entry.messageId)));
+  }
+
+  try {
+    const punishment = applyPunishmentOptions(settings);
+    if (punishment?.type === 'mute') {
+      await bot.restrictChatMember(msg.chat.id, msg.from.id, punishment.options);
+    } else if (punishment?.type === 'ban') {
+      await bot.banChatMember(msg.chat.id, msg.from.id, punishment.options);
+    }
+  } catch (error) {
+    console.error('Failed to apply antispam punishment:', error.message);
+  }
+
+  return true;
+}
+
+async function handleAntifloodMessage(msg) {
+  if (msg.chat.id !== MODERATOR_GROUP_ID || !msg.from || msg.from.is_bot) return false;
+
+  const settings = getAntifloodSettings(msg.chat.id);
+  if (!settings.enabled) return false;
+
+  const messageText = String(msg.text || msg.caption || '');
+  if (messageText.length <= settings.maxCharacters) return false;
+
+  await tryDeleteMessage(msg.chat.id, msg.message_id);
+
+  try {
+    const punishment = applyPunishmentOptions(settings);
+    if (punishment?.type === 'mute') {
+      await bot.restrictChatMember(msg.chat.id, msg.from.id, punishment.options);
+    } else if (punishment?.type === 'ban') {
+      await bot.banChatMember(msg.chat.id, msg.from.id, punishment.options);
+    }
+  } catch (error) {
+    console.error('Failed to apply antiflood punishment:', error.message);
+  }
+
+  return true;
+}
 function saveState() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
@@ -208,11 +425,17 @@ bot.onText(/^\/(start)(?:@[A-Za-z0-9_]+)?\b/i, async (msg) => {
   }
 });
 
+bot.onText(/^\/menu(?:@[A-Za-z0-9_]+)?\b/i, async (msg) => {
+  if (msg.chat.id !== MODERATOR_GROUP_ID) return;
+  await bot.sendMessage(msg.chat.id, '⚙️ Главное меню', { reply_markup: mainMenuKeyboard() });
+});
+
 bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|help|ban|unban|bans)(?:@[A-Za-z0-9_]+)?(?=\s|$)/i, async (msg, match) => {
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
     return;
   }
 
+        [{ text: '🌊 Антифлуд', callback_data: 'menu:antiflood' }],
   const hasHPrefix = String(match[1] || '').toLowerCase() === 'h';
   const rawCommand = String(match[2] || '').toLowerCase();
   const command = hasHPrefix ? `h${rawCommand}` : rawCommand;
@@ -298,6 +521,116 @@ bot.onText(/^(?:!|\/)(h?)(бан|разбан|баны|помощь|хелп|hel
 bot.on('callback_query', async (callbackQuery) => {
   const data = callbackQuery.data || '';
   const messageId = callbackQuery.message?.message_id;
+
+  if (callbackQuery.message?.chat?.id === MODERATOR_GROUP_ID && (data === 'menu:main' || data === 'menu:antispam' || data === 'menu:antiflood' || data.startsWith('antispam:') || data.startsWith('antiflood:'))) {
+    const chatId = callbackQuery.message.chat.id;
+    const settings = getAntispamSettings(chatId);
+
+    if (data === 'menu:main') {
+      await bot.editMessageText('⚙️ Главное меню', {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: mainMenuKeyboard(),
+      });
+    } else if (data === 'menu:antispam') {
+      await bot.editMessageText(antispamSettingsText(settings), {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: antispamSettingsKeyboard(settings),
+      });
+    } else if (data === 'menu:antiflood') {
+      const antifloodSettings = getAntifloodSettings(chatId);
+      await bot.editMessageText(antifloodSettingsText(antifloodSettings), {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: antifloodSettingsKeyboard(antifloodSettings),
+      });
+    } else if (data === 'antispam:messages' || data === 'antispam:interval') {
+      const type = data.endsWith('messages') ? 'messages' : 'interval';
+      const description = type === 'messages'
+        ? 'Выберите максимальное количество сообщений:'
+        : 'Выберите интервал времени в секундах:';
+      await bot.editMessageText(
+        `${description}\n\nАнтиспам срабатывает при отправке ${settings.maxMessages} сообщений за ${settings.intervalSeconds} сек.`,
+        {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: numberSelectionKeyboard(type),
+        }
+      );
+    } else if (data === 'antispam:toggle') {
+      settings.enabled = !settings.enabled;
+      saveState();
+      await bot.editMessageText(antispamSettingsText(settings), {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: antispamSettingsKeyboard(settings),
+      });
+    } else if (data === 'antispam:delete') {
+      settings.deleteMessages = !settings.deleteMessages;
+      saveState();
+      await bot.editMessageText(antispamSettingsText(settings), {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: antispamSettingsKeyboard(settings),
+      });
+    } else if (data.startsWith('antispam:punishment:')) {
+      settings.punishment = data.split(':')[2];
+      saveState();
+      await bot.editMessageText(antispamSettingsText(settings), {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: antispamSettingsKeyboard(settings),
+      });
+    } else if (data.startsWith('antispam:set-messages:') || data.startsWith('antispam:set-interval:')) {
+      const value = Number(data.split(':')[2]);
+      if (data.startsWith('antispam:set-messages:')) settings.maxMessages = value;
+      else settings.intervalSeconds = value;
+      saveState();
+      await bot.editMessageText(antispamSettingsText(settings), {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: antispamSettingsKeyboard(settings),
+      });
+    } else if (data.startsWith('antiflood:')) {
+      const antifloodSettings = getAntifloodSettings(chatId);
+      if (data === 'antiflood:characters') {
+        await bot.editMessageText('Выберите максимальное количество символов в одном сообщении:', {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: antifloodCharactersKeyboard(),
+        });
+      } else if (data === 'antiflood:toggle') {
+        antifloodSettings.enabled = !antifloodSettings.enabled;
+        saveState();
+        await bot.editMessageText(antifloodSettingsText(antifloodSettings), {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: antifloodSettingsKeyboard(antifloodSettings),
+        });
+      } else if (data.startsWith('antiflood:punishment:')) {
+        antifloodSettings.punishment = data.split(':')[2];
+        saveState();
+        await bot.editMessageText(antifloodSettingsText(antifloodSettings), {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: antifloodSettingsKeyboard(antifloodSettings),
+        });
+      } else if (data.startsWith('antiflood:set-characters:')) {
+        antifloodSettings.maxCharacters = Number(data.split(':')[2]);
+        saveState();
+        await bot.editMessageText(antifloodSettingsText(antifloodSettings), {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: antifloodSettingsKeyboard(antifloodSettings),
+        });
+      }
+    }
+
+    await bot.answerCallbackQuery(callbackQuery.id);
+    return;
+  }
+
   const question = state.questions[String(messageId)];
 
   if (!question) {
@@ -450,6 +783,14 @@ bot.on('message', async (msg) => {
   }
 
   if (msg.chat.id !== MODERATOR_GROUP_ID) {
+    return;
+  }
+
+  if (await handleAntispamMessage(msg)) {
+    return;
+  }
+
+  if (await handleAntifloodMessage(msg)) {
     return;
   }
 
